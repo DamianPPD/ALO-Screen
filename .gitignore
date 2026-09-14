@@ -1,0 +1,17 @@
+# Build outputs
+*.exe
+*.zip
+*.msi
+*.log
+
+# Common build directories
+bin/
+dist/
+release/
+
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
