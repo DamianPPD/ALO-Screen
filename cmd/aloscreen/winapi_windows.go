@@ -31,6 +31,8 @@ var (
 	procTrackPopupMenu                = user32.NewProc("TrackPopupMenu")
 	procDestroyMenu                   = user32.NewProc("DestroyMenu")
 	procGetCursorPos                  = user32.NewProc("GetCursorPos")
+	procGetForegroundWindow           = user32.NewProc("GetForegroundWindow")
+	procGetClassNameW                 = user32.NewProc("GetClassNameW")
 	procSetForegroundWindow           = user32.NewProc("SetForegroundWindow")
 	procSetProcessDpiAwarenessContext = user32.NewProc("SetProcessDpiAwarenessContext")
 	procEnumDisplayMonitors           = user32.NewProc("EnumDisplayMonitors")
@@ -162,7 +164,7 @@ type notifyIconData struct {
 	CbSize           uint32
 	HWnd             uintptr
 	UID              uint32
-	UFlags           uint32
+	UFlags            uint32
 	UCallbackMessage uint32
 	HIcon            uintptr
 	SzTip            [128]uint16
