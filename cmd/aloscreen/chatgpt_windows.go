@@ -35,20 +35,40 @@ func findChatGPTWindow() uintptr {
 	return found
 }
 
-func activateChatGPTAndPaste() error {
-	hwnd := findChatGPTWindow()
+func windowClassName(hwnd uintptr) string {
 	if hwnd == 0 {
-		return errors.New("nie znaleziono otwartego okna ChatGPT. Otwórz ten czat w osobnym oknie Edge/Chrome i spróbuj ponownie")
+		return ""
+	}
+	buf := make([]uint16, 256)
+	n, _, _ := procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+	if n == 0 {
+		return ""
+	}
+	return syscall.UTF16ToString(buf[:n])
+}
+
+func isSystemShellWindow(hwnd uintptr) bool {
+	switch windowClassName(hwnd) {
+	case "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "Progman", "WorkerW":
+		return true
+	default:
+		return false
+	}
+}
+
+func activateWindowAndPaste(hwnd uintptr) error {
+	if hwnd == 0 {
+		return errors.New("nie znaleziono okna, do którego można wkleić zrzut")
 	}
 
 	procShowWindow.Call(hwnd, swRestore)
 	procBringWindowToTop.Call(hwnd)
 	ret, _, _ := procSetForegroundWindow.Call(hwnd)
 	if ret == 0 {
-		return errors.New("Windows nie pozwolił przełączyć fokusu na okno ChatGPT")
+		return errors.New("Windows nie pozwolił przełączyć fokusu na poprzednio aktywne okno")
 	}
 
-	time.Sleep(160 * time.Millisecond)
+	time.Sleep(180 * time.Millisecond)
 	procKeybdEvent.Call(vkControl, 0, 0, 0)
 	procKeybdEvent.Call(vkV, 0, 0, 0)
 	procKeybdEvent.Call(vkV, 0, keyeventfKeyup, 0)
