@@ -1,8 +1,14 @@
 # ALO Screen
 
-A tiny portable Windows utility for taking a screenshot of a second monitor and pasting it into an open ChatGPT conversation with one click or the `F8` hotkey.
+A small portable Windows utility for taking a full screenshot of monitor 2 and pasting it into the window you are currently using with one click or the global `F8` hotkey.
 
-ALO Screen is designed for a simple workflow: keep tools such as GitHub Desktop, PowerShell, a terminal, logs, or another application on monitor 2, then send a full-screen snapshot to ChatGPT without opening Snipping Tool, selecting an area, copying, and pasting manually.
+ALO Screen is designed for a simple ChatGPT workflow: keep the content you want to show on monitor 2, keep the ChatGPT message field active on monitor 1, press `F8`, review the pasted screenshot, and send the message yourself.
+
+## Current version
+
+**ALO Screen 0.2**
+
+Version 0.2 fixes the window-detection problem from 0.1. The app no longer depends on the browser window title containing the word `ChatGPT`.
 
 ## Features
 
@@ -10,8 +16,9 @@ ALO Screen is designed for a simple workflow: keep tools such as GitHub Desktop,
 - Left-click the tray icon to capture
 - Captures the entire second monitor
 - Copies the screenshot directly to the Windows clipboard
-- Finds an open window whose title contains `ChatGPT`
-- Brings that window to the foreground and sends `Ctrl+V`
+- Remembers the foreground user window
+- Returns to that window and sends `Ctrl+V`
+- Does not require `ChatGPT` in the browser/window title
 - **Does not press Enter** — you review and send the message yourself
 - No installer required
 - No autostart
@@ -20,19 +27,21 @@ ALO Screen is designed for a simple workflow: keep tools such as GitHub Desktop,
 
 ## Typical workflow
 
-1. Open ChatGPT in Edge, Chrome, or another browser window.
-2. Click once in the ChatGPT message field so it has focus.
-3. Keep the applications you want to show on monitor 2.
-4. Press `F8` or left-click the ALO Screen tray icon.
-5. ALO Screen captures monitor 2 and pastes the image into ChatGPT.
+1. Open ChatGPT in Edge, Chrome, or another browser.
+2. Put the content you want to show on monitor 2.
+3. Click the ChatGPT message field so the ChatGPT window is active.
+4. Press `F8`.
+5. ALO Screen captures monitor 2, copies the image to the clipboard, and pastes it into the active ChatGPT message field.
 6. Review the screenshot and press Enter yourself.
+
+You can also left-click the tray icon. ALO Screen tracks the last normal foreground window so clicking the Windows tray does not normally lose the paste target.
 
 ## Tray menu
 
 Right-click the tray icon to access:
 
 - **Capture monitor 2 and paste**
-- **ALO Screen 0.1 / F8 status**
+- **ALO Screen 0.2 / F8 status**
 - **Exit**
 
 If Windows initially hides the icon under the `^` overflow menu, drag it next to the clock if you want it to remain visible.
@@ -42,15 +51,16 @@ If Windows initially hides the icon under the `^` overflow menu, drag it next to
 - Windows 10 or Windows 11
 - x64 system
 - Two monitors
-- An open ChatGPT window
 
 The current version prefers Windows display device `DISPLAY2`. If `DISPLAY2` is not present, it can fall back to the only non-primary display when exactly one secondary monitor exists.
 
-## Important limitation
+## Important behavior
 
-ALO Screen activates the ChatGPT window and sends `Ctrl+V`, but it does not currently locate the message box by UI automation. The ChatGPT message field should already have focus. This is intentional in version 0.1 because it keeps the utility small and predictable.
+ALO Screen does not use browser automation and does not search for the ChatGPT input field. It pastes with normal Windows `Ctrl+V` into the selected foreground window.
 
-If ChatGPT cannot be found or Windows refuses to change the foreground window, the screenshot remains in the clipboard and can still be pasted manually with `Ctrl+V`.
+For the most reliable ChatGPT workflow, click the message field before pressing `F8`.
+
+If Windows refuses to restore the target window, the screenshot remains in the clipboard and can still be pasted manually with `Ctrl+V`.
 
 ## Build from source
 
@@ -69,7 +79,7 @@ go test ./...
 Build a Windows GUI executable:
 
 ```powershell
-go build -trimpath -ldflags="-H=windowsgui -s -w" -o ALO-Screen.exe ./cmd/aloscreen
+go build -trimpath -ldflags="-H=windowsgui -s -w" -o ALO-Screen-0.2.exe ./cmd/aloscreen
 ```
 
 Or use:
@@ -78,7 +88,7 @@ Or use:
 build.bat
 ```
 
-The build script creates `ALO-Screen-0.1.exe` and runs the test suite first.
+The build script creates `ALO-Screen-0.2.exe` and runs the test suite first.
 
 ## Project structure
 
@@ -91,9 +101,9 @@ build.bat            Windows build script
 
 ## Privacy
 
-ALO Screen does not upload screenshots by itself and does not use the OpenAI API. It only captures the selected monitor, places the image in the local Windows clipboard, activates a ChatGPT window, and simulates `Ctrl+V`.
+ALO Screen does not upload screenshots by itself and does not use the OpenAI API. It captures the selected monitor, places the image in the local Windows clipboard, switches back to the selected window, and simulates `Ctrl+V`.
 
-The screenshot is sent only after you manually submit the message in ChatGPT.
+The screenshot is sent only after you manually submit the message.
 
 ## Security note
 
@@ -111,8 +121,17 @@ This is an independent utility and is not affiliated with or endorsed by OpenAI.
 
 ## Polski
 
-ALO Screen to małe narzędzie portable dla Windows. `F8` albo kliknięcie ikony przy zegarze wykonuje zrzut całego monitora 2, kopiuje go do schowka, przełącza do otwartego okna ChatGPT i wykonuje `Ctrl+V`.
+**ALO Screen 0.2** to małe narzędzie portable dla Windows.
+
+`F8` albo kliknięcie ikony przy zegarze:
+
+1. wykonuje zrzut całego monitora 2,
+2. kopiuje go do schowka,
+3. wraca do aktywnego / ostatnio używanego okna,
+4. wykonuje `Ctrl+V`.
+
+Najważniejsza zmiana względem 0.1: program **nie wymaga już słowa „ChatGPT” w tytule okna**.
+
+Najpewniejszy sposób użycia z ChatGPT: kliknij pole wiadomości, a następnie naciśnij `F8`.
 
 Program **nie naciska Enter**. Użytkownik sam sprawdza zrzut i wysyła wiadomość.
-
-Wersja 0.1 nie używa API ChatGPT, nie wysyła nic samodzielnie do sieci i nie uruchamia się automatycznie z Windowsem.
