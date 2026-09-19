@@ -5,7 +5,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -18,9 +20,11 @@ const (
 )
 
 type app struct {
-	hwnd       uintptr
-	hotkeyOkay bool
-	nid        notifyIconData
+	hwnd           uintptr
+	hotkeyOkay     bool
+	nid            notifyIconData
+	lastUserWindow atomic.Uintptr
+	trackerDone    chan struct{}
 }
 
 var currentApp *app
@@ -64,7 +68,7 @@ func newApp() (*app, error) {
 		return nil, fmt.Errorf("nie udało się utworzyć ukrytego okna: %v", err)
 	}
 
-	a := &app{hwnd: hwnd}
+	a := &app{hwnd: hwnd, trackerDone: make(chan struct{})}
 	currentApp = a
 
 	a.nid = notifyIconData{
@@ -88,12 +92,17 @@ func newApp() (*app, error) {
 
 	ret, _, _ = procRegisterHotKey.Call(hwnd, hotkeyID, modNoRepeat, vkF8)
 	a.hotkeyOkay = ret != 0
+	a.startForegroundTracker()
 	return a, nil
 }
 
 func (a *app) close() {
 	if a == nil {
 		return
+	}
+	if a.trackerDone != nil {
+		close(a.trackerDone)
+		a.trackerDone = nil
 	}
 	if a.hotkeyOkay {
 		procUnregisterHotKey.Call(a.hwnd, hotkeyID)
@@ -117,13 +126,49 @@ func (a *app) run() {
 	}
 }
 
+func (a *app) validPasteTarget(hwnd uintptr) bool {
+	if hwnd == 0 || hwnd == a.hwnd || isSystemShellWindow(hwnd) {
+		return false
+	}
+	visible, _, _ := procIsWindowVisible.Call(hwnd)
+	return visible != 0
+}
+
+func (a *app) startForegroundTracker() {
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-a.trackerDone:
+				return
+			case <-ticker.C:
+				hwnd, _, _ := procGetForegroundWindow.Call()
+				if a.validPasteTarget(hwnd) {
+					a.lastUserWindow.Store(hwnd)
+				}
+			}
+		}
+	}()
+}
+
 func (a *app) captureAndPaste() {
+	target, _, _ := procGetForegroundWindow.Call()
+	if !a.validPasteTarget(target) {
+		target = a.lastUserWindow.Load()
+	}
+
 	if err := captureTargetMonitorToClipboard(a.hwnd); err != nil {
 		showError("ALO Screen — zrzut", err.Error())
 		return
 	}
-	if err := activateChatGPTAndPaste(); err != nil {
-		showError("ALO Screen — ChatGPT", err.Error()+"\n\nZrzut został już skopiowany do schowka — możesz wkleić go ręcznie Ctrl+V.")
+
+	// Awaryjnie zachowujemy stare wyszukiwanie po nazwie, ale nie jest już wymagane.
+	if !a.validPasteTarget(target) {
+		target = findChatGPTWindow()
+	}
+	if err := activateWindowAndPaste(target); err != nil {
+		showError("ALO Screen — wklejanie", err.Error()+"\n\nZrzut został już skopiowany do schowka — możesz wkleić go ręcznie Ctrl+V.")
 	}
 }
 
@@ -135,9 +180,9 @@ func (a *app) showMenu() {
 	defer procDestroyMenu.Call(menu)
 
 	procAppendMenuW.Call(menu, mfString, menuCapture, uintptr(unsafe.Pointer(utf16Ptr("Zrób zrzut monitora 2 i wklej"))))
-	about := "ALO Screen 0.1 — F8: zrzut + wklejenie"
+	about := "ALO Screen 0.2 — F8: zrzut + wklejenie"
 	if !a.hotkeyOkay {
-		about = "ALO Screen 0.1 — F8 zajęty przez inny program"
+		about = "ALO Screen 0.2 — F8 zajęty przez inny program"
 	}
 	procAppendMenuW.Call(menu, mfString, menuAbout, uintptr(unsafe.Pointer(utf16Ptr(about))))
 	procAppendMenuW.Call(menu, mfString, menuExit, uintptr(unsafe.Pointer(utf16Ptr("Zamknij"))))
@@ -174,11 +219,11 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 				a.captureAndPaste()
 				return 0
 			case menuAbout:
-				text := "ALO Screen 0.1\n\nLewy klik ikony lub F8:\n1. zrzut całego monitora 2\n2. kopiowanie do schowka\n3. przełączenie do ChatGPT\n4. Ctrl+V\n\nEnter naciskasz sam."
+				text := "ALO Screen 0.2\n\nLewy klik ikony lub F8:\n1. zrzut całego monitora 2\n2. kopiowanie do schowka\n3. powrót do ostatnio aktywnego okna\n4. Ctrl+V\n\nNie wyszukuje już ChatGPT po nazwie okna. Enter naciskasz sam."
 				if !a.hotkeyOkay {
 					text += "\n\nUwaga: F8 jest aktualnie zajęty przez inny program. Ikona w zasobniku nadal działa."
 				}
-				procMessageBoxW.Call(hwnd, uintptr(unsafe.Pointer(utf16Ptr(text))), uintptr(unsafe.Pointer(utf16Ptr("ALO Screen 0.1"))), mbOK)
+				procMessageBoxW.Call(hwnd, uintptr(unsafe.Pointer(utf16Ptr(text))), uintptr(unsafe.Pointer(utf16Ptr("ALO Screen 0.2"))), mbOK)
 				return 0
 			case menuExit:
 				procDestroyWindow.Call(hwnd)
